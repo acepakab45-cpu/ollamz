@@ -11,26 +11,36 @@ MODEL = "gemma4:31b-cloud"
 
 def get_ollama_status():
     try:
-        r = requests.get("http://localhost:11434/api/tags", timeout=5)
-
-        models = r.json().get("models", [])
-
-        installed = any(
-            m.get("name") == MODEL
-            for m in models
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": "gemma4:31b-cloud",
+                "prompt": "hello",
+                "stream": False
+            },
+            timeout=30
         )
+
+        result = response.json()
+
+        if "error" in result:
+            return {
+                "running": True,
+                "ready": False,
+                "message": result["error"]
+            }
 
         return {
             "running": True,
-            "installed": installed,
-            "models": [m.get("name") for m in models]
+            "ready": True,
+            "message": "Cloud model ready"
         }
 
     except Exception as e:
         return {
             "running": False,
-            "installed": False,
-            "error": str(e)
+            "ready": False,
+            "message": str(e)
         }
 
 # --------------------------------------------------

@@ -7,44 +7,31 @@ OLLAMA_HOST = "http://localhost:11434"
 OLLAMA_GENERATE = f"{OLLAMA_HOST}/api/generate"
 OLLAMA_TAGS = f"{OLLAMA_HOST}/api/tags"
 
-MODEL = "gemma4:31b"
+MODEL = "gemma4:31b-cloud"
 
-# --------------------------------------------------
-# CHECK OLLAMA STATUS
-# --------------------------------------------------
 def get_ollama_status():
     try:
-        r = requests.get(OLLAMA_TAGS, timeout=5)
-
-        if r.status_code != 200:
-            return {
-                "running": False,
-                "installed": False,
-                "message": "Ollama not responding"
-            }
+        r = requests.get("http://localhost:11434/api/tags", timeout=5)
 
         models = r.json().get("models", [])
 
-        installed = False
-
-        for model in models:
-            if MODEL in model.get("name", ""):
-                installed = True
-                break
+        installed = any(
+            m.get("name") == MODEL
+            for m in models
+        )
 
         return {
             "running": True,
             "installed": installed,
-            "message": "Ready" if installed else "Model not installed"
+            "models": [m.get("name") for m in models]
         }
 
     except Exception as e:
         return {
             "running": False,
             "installed": False,
-            "message": str(e)
+            "error": str(e)
         }
-
 
 # --------------------------------------------------
 # WEB UI

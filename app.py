@@ -3,85 +3,151 @@ import requests
 
 app = Flask(__name__)
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "gemma4:31b-cloud"
+OLLAMA_HOST = "http://localhost:11434"
+OLLAMA_GENERATE = f"{OLLAMA_HOST}/api/generate"
+OLLAMA_TAGS = f"{OLLAMA_HOST}/api/tags"
+
+MODEL = "gemma4:31b"
+
+# --------------------------------------------------
+# CHECK OLLAMA STATUS
+# --------------------------------------------------
+def get_ollama_status():
+    try:
+        r = requests.get(OLLAMA_TAGS, timeout=5)
+
+        if r.status_code != 200:
+            return {
+                "running": False,
+                "installed": False,
+                "message": "Ollama not responding"
+            }
+
+        models = r.json().get("models", [])
+
+        installed = False
+
+        for model in models:
+            if MODEL in model.get("name", ""):
+                installed = True
+                break
+
+        return {
+            "running": True,
+            "installed": installed,
+            "message": "Ready" if installed else "Model not installed"
+        }
+
+    except Exception as e:
+        return {
+            "running": False,
+            "installed": False,
+            "message": str(e)
+        }
 
 
-# =========================
-# 🌐 WEB CHAT INTERFACE
-# =========================
+# --------------------------------------------------
+# WEB UI
+# --------------------------------------------------
 @app.route("/")
-def chat_ui():
+def index():
     return render_template("chat.html")
 
 
-# =========================
-# 🤖 OLLAMA-STYLE GENERATE API (n8n friendly)
-# =========================
-@app.route("/api/generate", methods=["POST"])
-def generate():
-    data = request.get_json()
-
-    prompt = data.get("prompt", "")
-
-    payload = {
-        "model": MODEL,
-        "prompt": prompt,
-        "stream": False
-    }
-
-    try:
-        response = requests.post(OLLAMA_URL, json=payload, timeout=120)
-        return jsonify(response.json())
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+# --------------------------------------------------
+# STATUS
+# --------------------------------------------------
+@app.route("/status")
+def status():
+    return jsonify(get_ollama_status())
 
 
-# =========================
-# 💬 OLLAMA-STYLE CHAT API (BEST FOR n8n)
-# =========================
+# --------------------------------------------------
+# GENERATE
+# --------------------------------------------------
 @app.route("/api/chat", methods=["POST"])
 def chat():
-    data = request.get_json()
 
+    data = request.get_json()
     message = data.get("message", "")
 
+    status_info = get_ollama_status()
+
+    if not status_info["running"]:
+        return jsonify({
+            "reply": "❌ Ollama server is not running."
+        })
+
+    if not status_info["installed"]:
+        return jsonify({
+            "reply": f"❌ Model '{MODEL}' is not installed."
+        })
+
     try:
-        response = requests.post(OLLAMA_URL, json={
-            "model": MODEL,
-            "prompt": message,
-            "stream": False
-        }, timeout=120)
+
+        response = requests.post(
+            OLLAMA_GENERATE,
+            json={
+                "model": MODEL,
+                "prompt": message,
+                "stream": False
+            },
+            timeout=300
+        )
 
         result = response.json()
 
-        reply = result.get("response") or result.get("output") or result.get("message")
+        print("\n========== OLLAMA RESPONSE ==========")
+        print(result)
+        print("=====================================\n")
+
+        reply = result.get("response")
 
         if not reply:
-            reply = "No response from model."
+            reply = f"Unexpected response:\n{result}"
 
         return jsonify({
-            "reply": reply,
-            "model": MODEL
+            "reply": reply
         })
 
     except Exception as e:
         return jsonify({
-            "reply": f"Error: {str(e)}",
-            "model": MODEL
+            "reply": f"Error: {str(e)}"
         })
 
 
-# =========================
-# 🏠 HOME
-# =========================
-@app.route("/status")
-def status():
-    return jsonify({
-        "status": "running",
-        "model": MODEL
-    })
+# --------------------------------------------------
+# TEST MODEL
+# --------------------------------------------------
+@app.route("/test")
+def test_model():
+
+    try:
+
+        response = requests.post(
+            OLLAMA_GENERATE,
+            json={
+                "model": MODEL,
+                "prompt": "Say Hello",
+                "stream": False
+            },
+            timeout=60
+        )
+
+        return response.json()
+
+    except Exception as e:
+        return jsonify({
+            "error": str(e)
+        })
 
 
+# --------------------------------------------------
+# MAIN
+# --------------------------------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(
+        host="0.0.0.0",
+        port=5000,
+        debug=True
+    )

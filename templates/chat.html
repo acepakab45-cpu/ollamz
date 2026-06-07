@@ -1,49 +1,187 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Ollama Chat</title>
-    <style>
-        body { font-family: Arial; background:#111; color:#fff; }
-        #chat { width: 600px; margin: auto; margin-top: 40px; }
-        .box { height: 400px; overflow-y: auto; border:1px solid #444; padding:10px; }
-        input { width: 80%; padding:10px; }
-        button { padding:10px; }
-        .user { color: #4CAF50; }
-        .bot { color: #00bcd4; }
-    </style>
+
+<meta charset="UTF-8">
+
+<title>Gemma AI Chat</title>
+
+<style>
+
+body{
+    background:#111;
+    color:white;
+    font-family:Arial;
+}
+
+#container{
+    width:900px;
+    margin:auto;
+    margin-top:20px;
+}
+
+#status{
+    padding:10px;
+    margin-bottom:15px;
+    border-radius:5px;
+    font-weight:bold;
+}
+
+.good{
+    background:#0d652d;
+}
+
+.bad{
+    background:#7a1616;
+}
+
+#chatbox{
+    height:500px;
+    overflow-y:auto;
+    border:1px solid #444;
+    padding:10px;
+}
+
+.user{
+    color:#7CFC00;
+    margin-top:10px;
+}
+
+.bot{
+    color:#00BFFF;
+    margin-top:10px;
+}
+
+input{
+    width:80%;
+    padding:12px;
+}
+
+button{
+    padding:12px;
+    cursor:pointer;
+}
+
+</style>
+
 </head>
+
 <body>
 
-<div id="chat">
-    <h2>💬 AI Chat</h2>
+<div id="container">
 
-    <div class="box" id="box"></div>
+<h2>🤖 Gemma AI Chat</h2>
 
-    <br>
+<div id="status">
+Loading status...
+</div>
 
-    <input id="msg" placeholder="Type message...">
-    <button onclick="send()">Send</button>
+<div id="chatbox"></div>
+
+<br>
+
+<input
+    id="msg"
+    placeholder="Type message..."
+    onkeydown="if(event.key==='Enter') sendMessage()"
+/>
+
+<button onclick="sendMessage()">
+Send
+</button>
+
 </div>
 
 <script>
-async function send() {
-    let msg = document.getElementById("msg").value;
-    document.getElementById("msg").value = "";
 
-    document.getElementById("box").innerHTML += 
-        `<div class="user">You: ${msg}</div>`;
+async function checkStatus(){
 
-    let res = await fetch("/api/chat", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({message: msg})
+    try{
+
+        let res = await fetch('/status');
+        let data = await res.json();
+
+        let div = document.getElementById("status");
+
+        if(data.running && data.installed){
+
+            div.className = "good";
+
+            div.innerHTML =
+                "✅ Ollama Running<br>" +
+                "✅ Model Installed<br>" +
+                "Model: gemma4:31b";
+
+        }
+        else if(data.running){
+
+            div.className = "bad";
+
+            div.innerHTML =
+                "⚠️ Ollama Running<br>" +
+                "❌ Model Missing";
+
+        }
+        else{
+
+            div.className = "bad";
+
+            div.innerHTML =
+                "❌ Ollama Not Running";
+
+        }
+
+    }
+    catch(err){
+
+        document.getElementById("status").innerHTML =
+            "❌ Cannot connect to Flask";
+
+    }
+
+}
+
+async function sendMessage(){
+
+    let input = document.getElementById("msg");
+
+    let msg = input.value.trim();
+
+    if(msg === "")
+        return;
+
+    input.value = "";
+
+    let box = document.getElementById("chatbox");
+
+    box.innerHTML +=
+        `<div class="user"><b>You:</b> ${msg}</div>`;
+
+    box.scrollTop = box.scrollHeight;
+
+    let res = await fetch("/api/chat",{
+        method:"POST",
+        headers:{
+            "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+            message:msg
+        })
     });
 
-let data = await res.json();
+    let data = await res.json();
 
-document.getElementById("box").innerHTML += 
-    `<div class="bot">AI: ${data.reply ?? "No response"}</div>`;
+    box.innerHTML +=
+        `<div class="bot"><b>Gemma:</b> ${data.reply}</div>`;
+
+    box.scrollTop = box.scrollHeight;
+
 }
+
+checkStatus();
+
+setInterval(checkStatus,5000);
+
 </script>
 
 </body>

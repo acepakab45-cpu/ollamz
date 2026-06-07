@@ -39,10 +39,10 @@ async function send() {
         body: JSON.stringify({message: msg})
     });
 
-    let data = await res.json();
+let data = await res.json();
 
-    document.getElementById("box").innerHTML += 
-        `<div class="bot">AI: ${data.reply}</div>`;
+document.getElementById("box").innerHTML += 
+    `<div class="bot">AI: ${data.reply ?? "No response"}</div>`;
 }
 </script>
 

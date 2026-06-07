@@ -46,24 +46,30 @@ def chat():
 
     message = data.get("message", "")
 
-    payload = {
-        "model": MODEL,
-        "prompt": message,
-        "stream": False
-    }
-
     try:
-        response = requests.post(OLLAMA_URL, json=payload, timeout=120)
+        response = requests.post(OLLAMA_URL, json={
+            "model": MODEL,
+            "prompt": message,
+            "stream": False
+        }, timeout=120)
+
         result = response.json()
 
-        # CLEAN RESPONSE FOR n8n
+        reply = result.get("response") or result.get("output") or result.get("message")
+
+        if not reply:
+            reply = "No response from model."
+
         return jsonify({
-            "reply": result.get("response"),
+            "reply": reply,
             "model": MODEL
         })
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({
+            "reply": f"Error: {str(e)}",
+            "model": MODEL
+        })
 
 
 # =========================
